@@ -1,32 +1,38 @@
 import { homedir } from "os";
 import { join } from "path";
+import { readdirSync } from "fs";
 
 // ─── Logos Data Paths ────────────────────────────────────────────────────────
 
-const LOGOS_BASE = join(
-  homedir(),
-  "Library",
-  "Application Support",
-  "Logos4",
-  "Documents",
-  "a3wo155q.w14"
-);
+// Logos stores per-install data under a randomly named instance directory
+// (e.g. "a3wo155q.w14"). Detect it instead of hardcoding.
+function detectInstanceDir(root: string): string {
+  try {
+    const dirs = readdirSync(root, { withFileTypes: true }).filter((e) =>
+      e.isDirectory()
+    );
+    if (dirs.length > 0) return join(root, dirs[0].name);
+  } catch {
+    // root missing — fall through, DB reads will report file-not-found
+  }
+  return root;
+}
+
+const IS_WINDOWS = process.platform === "win32";
+
+const LOGOS_ROOT = IS_WINDOWS
+  ? join(
+      process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"),
+      "Logos"
+    )
+  : join(homedir(), "Library", "Application Support", "Logos4");
 
 export const LOGOS_DATA_DIR =
-  process.env.LOGOS_DATA_DIR ?? LOGOS_BASE;
+  process.env.LOGOS_DATA_DIR ?? detectInstanceDir(join(LOGOS_ROOT, "Documents"));
 
 // Catalog DB lives under Data/ (not Documents/)
-const LOGOS_CATALOG_BASE = join(
-  homedir(),
-  "Library",
-  "Application Support",
-  "Logos4",
-  "Data",
-  "a3wo155q.w14"
-);
-
 export const LOGOS_CATALOG_DIR =
-  process.env.LOGOS_CATALOG_DIR ?? LOGOS_CATALOG_BASE;
+  process.env.LOGOS_CATALOG_DIR ?? detectInstanceDir(join(LOGOS_ROOT, "Data"));
 
 export const DB_PATHS = {
   visualMarkup: join(LOGOS_DATA_DIR, "VisualMarkup", "visualmarkup.db"),

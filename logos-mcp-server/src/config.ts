@@ -1,13 +1,25 @@
 import { homedir } from "os";
-import { join } from "path";
+import { join, dirname } from "path";
 import { existsSync, readdirSync, statSync } from "fs";
+import { fileURLToPath } from "url";
 
-// Load .env from the working directory (Node 20.12+). The README documents
-// .env for development; MCP clients normally pass env via their config.
-try {
-  process.loadEnvFile();
-} catch {
-  // No .env file, or Node predates loadEnvFile — env must come from the client.
+// Load .env for development (Node 20.12+; real env vars take precedence).
+// MCP clients launch the server from an arbitrary cwd, so try the working
+// directory, then the package root, then the repo root (where the README
+// documents .env). First file found wins.
+const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+for (const envPath of [
+  join(process.cwd(), ".env"),
+  join(PACKAGE_ROOT, ".env"),
+  join(PACKAGE_ROOT, "..", ".env"),
+]) {
+  try {
+    process.loadEnvFile(envPath);
+    break;
+  } catch {
+    // File absent or Node predates loadEnvFile — keep trying; env may
+    // legitimately come from the MCP client config instead.
+  }
 }
 
 // ─── Logos Data Paths ────────────────────────────────────────────────────────

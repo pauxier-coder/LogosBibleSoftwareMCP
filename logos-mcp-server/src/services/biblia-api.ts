@@ -15,7 +15,9 @@ async function bibliaFetch(path: string, params: Record<string, string>): Promis
   const res = await fetch(url.toString());
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Biblia API error ${res.status}: ${body}`);
+    // Error bodies can be full HTML blobs — keep the message digestible.
+    const snippet = body.length > 200 ? `${body.slice(0, 200)}…` : body;
+    throw new Error(`Biblia API error ${res.status}: ${snippet}`);
   }
 
   const contentType = res.headers.get("content-type") ?? "";
@@ -37,6 +39,15 @@ export async function getBibleText(
   };
 }
 
+// Biblia returns resultCount: -1 when the total is unknown; fall back to the
+// number of results actually returned in that case.
+export function normalizeResultCount(
+  resultCount: number | null | undefined,
+  resultsLength: number
+): number {
+  return resultCount != null && resultCount >= 0 ? resultCount : resultsLength;
+}
+
 export async function searchBible(
   query: string,
   options: { bible?: string; limit?: number; mode?: string } = {}
@@ -48,10 +59,11 @@ export async function searchBible(
     limit: String(options.limit ?? 20),
   }) as { resultCount: number; results: Array<{ title: string; preview: string }> };
 
+  const results = data.results ?? [];
   return {
     query,
-    resultCount: data.resultCount ?? 0,
-    results: (data.results ?? []).map((r): BibleSearchHit => ({
+    resultCount: normalizeResultCount(data.resultCount, results.length),
+    results: results.map((r): BibleSearchHit => ({
       title: r.title ?? "",
       preview: r.preview ?? "",
     })),

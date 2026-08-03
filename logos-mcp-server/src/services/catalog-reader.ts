@@ -107,6 +107,27 @@ export function typeLabel(type: string): string {
   return TYPE_LABELS[type] ?? type.split(".").pop() ?? type;
 }
 
+// Reverse map: human label (lowercased) -> raw dotted type prefixes that carry
+// that label. A label can map to several raw types (e.g. "Commentary").
+const LABEL_TO_RAW_TYPES: Map<string, string[]> = new Map();
+for (const [raw, label] of Object.entries(TYPE_LABELS)) {
+  const key = label.toLowerCase();
+  const list = LABEL_TO_RAW_TYPES.get(key) ?? [];
+  list.push(raw);
+  LABEL_TO_RAW_TYPES.set(key, list);
+}
+
+// Resolve a user-supplied type filter to raw dotted type prefix(es). Accepts
+// either form: raw dotted types ("text.monograph.commentary.bible") pass
+// through unchanged; human labels ("Commentary", "greek lexicon") are
+// translated to the raw prefix(es) that carry that label.
+export function resolveTypeFilter(input: string): string[] {
+  const labelKey = input.trim().toLowerCase();
+  const rawTypes = LABEL_TO_RAW_TYPES.get(labelKey);
+  if (rawTypes && rawTypes.length > 0) return rawTypes;
+  return [input];
+}
+
 // ─── Search Catalog ─────────────────────────────────────────────────────────
 
 export function searchCatalog(options: {
@@ -126,8 +147,11 @@ export function searchCatalog(options: {
     const params: unknown[] = [];
 
     if (options.type) {
-      sql += " AND Type LIKE ?";
-      params.push(`%${options.type}%`);
+      const patterns = resolveTypeFilter(options.type);
+      sql += ` AND (${patterns.map(() => "Type LIKE ?").join(" OR ")})`;
+      for (const p of patterns) {
+        params.push(`%${p}%`);
+      }
     }
     if (options.query) {
       sql += " AND (Title LIKE ? OR Description LIKE ? OR Subjects LIKE ?)";
@@ -185,16 +209,47 @@ export function getResourceTypeSummary(): ResourceTypeSummary[] {
       Count: number;
     }>;
 
-    // Collapse types that share the same human-readable label
-    const merged = new Map<string, number>();
+    // Collapse types that share the same human-readable label, keeping the
+    // raw dotted type with the highest individual count as the representative.
+    const merged = new Map<string, { count: number; rawType: string; topCount: number }>();
     for (const r of rows) {
       const label = typeLabel(r.Type);
-      merged.set(label, (merged.get(label) ?? 0) + r.Count);
+      const entry = merged.get(label);
+      if (!entry) {
+        merged.set(label, { count: r.Count, rawType: r.Type, topCount: r.Count });
+      } else {
+        entry.count += r.Count;
+        if (r.Count > entry.topCount) {
+          entry.topCount = r.Count;
+          entry.rawType = r.Type;
+        }
+      }
     }
     return Array.from(merged.entries())
-      .map(([label, count]) => ({ label, count }))
+      .map(([label, e]) => ({ label, rawType: e.rawType, count: e.count }))
       .sort((a, b) => b.count - a.count);
   } finally {
     db.close();
+  }
+}
+
+// ─── Resource Title Lookup ──────────────────────────────────────────────────
+
+// Best-effort title lookup for a resourceId. Returns null when the catalog
+// DB is missing/unreadable or the id isn't found (callers should never throw).
+export function getResourceTitle(resourceId: string): string | null {
+  if (!resourceId) return null;
+  try {
+    const db = openDb(DB_PATHS.catalog);
+    try {
+      const row = db
+        .prepare("SELECT Title FROM Records WHERE ResourceId = ? LIMIT 1")
+        .get(resourceId) as { Title: string } | undefined;
+      return row?.Title ?? null;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return null;
   }
 }

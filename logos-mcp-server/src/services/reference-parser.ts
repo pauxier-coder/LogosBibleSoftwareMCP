@@ -165,7 +165,7 @@ const SINGLE_CHAPTER_BOOKS = new Set([
 
 // ─── Helper: resolve book name ──────────────────────────────────────────────
 
-function resolveBookName(input: string): string | null {
+export function resolveBookName(input: string): string | null {
   const trimmed = input.trim();
   // Try exact match first (case-insensitive)
   const direct = NAME_LOOKUP.get(trimmed.toLowerCase());
@@ -186,7 +186,9 @@ export function parseReference(input: string): ParsedReference {
   );
 
   if (!match) {
-    throw new Error(`Cannot parse reference: "${input}"`);
+    throw new Error(
+      `Cannot parse reference: "${input}". Expected formats like "John 3:16", "1 Cor 13:4-7", "Ps 23" (book name or common abbreviation, chapter[:verse[-endVerse]]).`
+    );
   }
 
   const rawBook = match[1].trim();

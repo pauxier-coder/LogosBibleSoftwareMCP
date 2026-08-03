@@ -296,3 +296,28 @@ describe("expandRange", () => {
     expect(expandRange("Genesis 1")).toBe("Genesis 1");
   });
 });
+
+describe("parseReference error messages", () => {
+  it("includes the unparseable input", () => {
+    expect(() => parseReference("not a reference")).toThrow(
+      'Cannot parse reference: "not a reference"'
+    );
+  });
+
+  it("includes accepted formats and examples", () => {
+    expect(() => parseReference("not a reference")).toThrow(
+      'Expected formats like "John 3:16"'
+    );
+    expect(() => parseReference("not a reference")).toThrow('"1 Cor 13:4-7"');
+    expect(() => parseReference("not a reference")).toThrow('"Ps 23"');
+    expect(() => parseReference("not a reference")).toThrow(
+      "chapter[:verse[-endVerse]]"
+    );
+  });
+
+  it("still throws a plain unknown-book error for a valid shape with a bad book", () => {
+    expect(() => parseReference("NotABook 3:16")).toThrow(
+      'Unknown book: "NotABook"'
+    );
+  });
+});

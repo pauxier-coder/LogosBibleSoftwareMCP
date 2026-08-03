@@ -55,6 +55,8 @@ export interface HighlightResult {
   textRange: string;
   styleName: string;
   syncDate: string | null;
+  /** Human-readable title of the resource this highlight lives in (best-effort, null when the catalog is unavailable). */
+  resourceTitle: string | null;
 }
 
 export interface FavoriteResult {
@@ -108,6 +110,8 @@ export interface ReadingListStatus {
   author: string;
   path: string;
   status: number;
+  /** Human-readable label for `status` (1 = Active, 2 = Completed). */
+  statusLabel: string;
   modifiedDate: string | null;
 }
 
@@ -117,6 +121,17 @@ export interface ReadingProgress {
   totalItems: number;
   completedItems: number;
   percentComplete: number;
+}
+
+export interface ClippingResult {
+  rowId: number;
+  resourceId: string;
+  createdDate: string;
+  collectionTitle: string | null;
+  title: string | null;
+  content: string | null;
+  notes: string | null;
+  tags: string | null;
 }
 
 // ─── Catalog Types ──────────────────────────────────────────────────────────
@@ -134,6 +149,8 @@ export interface CatalogResource {
 
 export interface ResourceTypeSummary {
   label: string;
+  /** Raw dotted type (e.g. "text.monograph.dictionary.lexicon.greek") that best represents this label. */
+  rawType: string;
   count: number;
 }
 
@@ -160,6 +177,36 @@ export interface BibleInfo {
   publishers: string[];
 }
 
+// ─── Screenshot / Window Types ───────────────────────────────────────────────
+
+export interface LogosWindow {
+  windowID: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  name: string;
+  owner: string;
+  layer: number;
+}
+
+export interface ScreenshotResult {
+  success: boolean;
+  imageBase64?: string;
+  description?: string;
+  bounds?: { x: number; y: number; width: number; height: number };
+  error?: string;
+}
+
+export type CaptureToolType =
+  | "bible"
+  | "factbook"
+  | "wordstudy"
+  | "guide"
+  | "search"
+  | "searchall"
+  | "resource";
+
 // ─── MCP Tool Types ──────────────────────────────────────────────────────────
 
 export interface ToolDefinition {
@@ -170,9 +217,9 @@ export interface ToolDefinition {
 }
 
 export interface ToolResult {
-  content: Array<{
-    type: "text";
-    text: string;
-  }>;
+  content: Array<
+    | { type: "text"; text: string }
+    | { type: "image"; data: string; mimeType: string }
+  >;
   isError?: boolean;
 }

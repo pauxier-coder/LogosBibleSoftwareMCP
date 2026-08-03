@@ -2,6 +2,26 @@
   "name": "logos-mcp-server",
   "version": "1.0.0",
   "description": "MCP server for Logos Bible Software integration",
+  "license": "MIT",
+  "author": "Rob Pecoraro",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robrawks/LogosInteraction.git"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "logos",
+    "bible",
+    "bible-study",
+    "claude"
+  ],
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "logos-mcp": "dist/index.js"
+  },
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

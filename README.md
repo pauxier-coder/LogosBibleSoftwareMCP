@@ -4,7 +4,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that c
 
 ## What This Does
 
-- **20 MCP tools** that let Claude read Bible text, search Scripture, navigate Logos, access your notes/highlights/favorites, check reading plans, explore word studies and factbook entries, search your library catalog, open commentaries and lexicons, and run cross-resource searches
+- **23 MCP tools** that let Claude read Bible text, search Scripture, navigate Logos, access your notes/highlights/favorites/clippings, check reading plans, explore word studies and factbook entries, search your library catalog, open commentaries and lexicons, run cross-resource searches, and capture Logos panels for vision reading
 - **A Socratic Bible Study agent** that guides you through Scripture using questions (not lectures), welcoming any denominational background, with four questioning layers: Observation, Interpretation, Correlation, and Application
 
 ## Prerequisites
@@ -16,6 +16,8 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that c
 | **Node.js** | v18+ (v23+ recommended for native `fetch` support) |
 | **Claude Code** | Anthropic's CLI tool ([install guide](https://docs.anthropic.com/en/docs/claude-code)) |
 | **Biblia API Key** | Free key from [bibliaapi.com](https://bibliaapi.com/) |
+| **Xcode Command Line Tools** | `clang` is required to compile the window-capture helper used by `capture_panel_screenshot` (install: `xcode-select --install`) |
+| **macOS permissions** | Screen Recording permission for your terminal app (System Settings → Privacy & Security → Screen Recording) is required for screenshots; Automation/Accessibility permission is prompted on first AppleScript use (detecting whether Logos is running) |
 
 ## Setup
 
@@ -69,7 +71,27 @@ BIBLIA_API_KEY=your_api_key_here
 claude
 ```
 
-Once Claude Code starts, type `/mcp` to check that the "logos" server appears with 20 tools.
+Once Claude Code starts, type `/mcp` to check that the "logos" server appears with 23 tools.
+
+## Using with Claude Desktop or Cowork
+
+The same server can be used with Claude Desktop or other MCP clients. Edit `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "logos": {
+      "command": "node",
+      "args": ["/Users/you/LogosInteraction/logos-mcp-server/dist/index.js"],
+      "env": {
+        "BIBLIA_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+Use an **absolute path** in `args` — relative paths only resolve when the client is launched from the repo root, which is not guaranteed for desktop apps. The same absolute-path rule applies to any MCP client (Claude Code's `.mcp.json` works with relative paths only because it is loaded from the project root).
 
 ## Available Tools
 
@@ -93,6 +115,8 @@ Tools that open things in the Logos desktop app
 | `open_factbook` | Opens a Factbook entry for a person, place, event, or topic |
 | `open_resource` | Opens a specific commentary, lexicon, or other resource in Logos at a passage |
 | `open_guide` | Opens an Exegetical Guide or Passage Guide for a Bible passage |
+| `get_logos_state` | Checks whether Logos is running and lists its open window titles |
+| `capture_panel_screenshot` | Navigates Logos and captures the visible panel as an image for AI vision |
 
 ### Search & Discovery
 Tools for searching Bible text and library resources
@@ -119,6 +143,7 @@ Tools for accessing your notes, highlights, favorites, and reading progress
 |------|-------------|
 | `get_user_notes` | Reads your study notes from Logos |
 | `get_user_highlights` | Reads your highlights and visual markup |
+| `get_clippings` | Reads your saved clippings (excerpt text you clipped from resources) |
 | `get_favorites` | Lists your saved favorites/bookmarks |
 | `get_reading_progress` | Shows your reading plan status |
 
@@ -164,7 +189,7 @@ LogosInteraction/
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── src/
-│   │   ├── index.ts                   # MCP server entry point (20 tools)
+│   │   ├── index.ts                   # MCP server entry point (23 tools)
 │   │   ├── config.ts                  # Paths, API config, constants
 │   │   ├── types.ts                   # Shared TypeScript types
 │   │   └── services/
@@ -178,21 +203,18 @@ LogosInteraction/
 
 ## How It Works
 
-The MCP server integrates with Logos through three channels:
+The MCP server integrates with Logos through four channels:
 
 - **Biblia API** - Retrieves Bible text and search results via the free REST API from Faithlife (same company as Logos)
 - **macOS URL schemes** - Opens passages, word studies, and factbook entries directly in the Logos app using `logos4:///` URLs
 - **SQLite databases** - Reads your personal data (notes, highlights, favorites, workflows, reading plans) and library catalog directly from the Logos local database files (read-only access, never modifies your data)
+- **Screen capture + vision** - Captures Logos windows so AI can read content displayed in the app UI when direct DB text access is unavailable
 
 ## Logos Data Path
 
-The server expects Logos data at:
+The server auto-detects your Logos data by scanning `~/Library/Application Support/Logos4/` for the per-install instance directory. Each Logos install uses a randomly named directory (e.g. `a3wo155q.w14`), so there is no fixed path to configure.
 
-```
-~/Library/Application Support/Logos4/Documents/a3wo155q.w14/
-```
-
-If your Logos data is at a different path, set the `LOGOS_DATA_DIR` environment variable in `.mcp.json`. The library catalog lives under `Data/` (not `Documents/`) — set `LOGOS_CATALOG_DIR` if your catalog path differs:
+If your Logos data lives at a non-standard path, the `LOGOS_DATA_DIR` and `LOGOS_CATALOG_DIR` environment variables remain available as manual overrides (set them in `.mcp.json`). The library catalog lives under `Data/` (not `Documents/`) — set `LOGOS_CATALOG_DIR` if your catalog path differs:
 
 ```json
 {
@@ -212,13 +234,17 @@ If your Logos data is at a different path, set the `LOGOS_DATA_DIR` environment 
 
 ## Troubleshooting
 
-**"BIBLIA_API_KEY is not set"** - Make sure your `.mcp.json` has the `env` block with your API key.
+**"BIBLIA_API_KEY is not set"** - Get a free key at [bibliaapi.com](https://bibliaapi.com/) and add it to the `env` block in `.mcp.json`. Bible-text tools need it, but Logos-local tools (notes, highlights, clippings, library catalog) work without it.
 
-**"Database not found"** - Your Logos data path may differ. Run `find ~/Library/Application\ Support/Logos4 -name "*.db" -maxdepth 5` to find your databases and update `LOGOS_DATA_DIR`.
+**"Database not found"** - Logos isn't installed, or your data is at a non-standard path. Run `find ~/Library/Application\ Support/Logos4 -name "*.db" -maxdepth 5` to locate your databases and set `LOGOS_DATA_DIR`.
+
+**Screenshot tool fails** - Check that your terminal app has Screen Recording permission (System Settings → Privacy & Security → Screen Recording) and that Xcode Command Line Tools are installed (`xcode-select --install`).
 
 **Tools don't appear in `/mcp`** - Restart Claude Code. The MCP server is loaded at startup from `.mcp.json`.
 
 **Logos doesn't open passages** - Make sure Logos Bible Software is running before using `navigate_passage`, `open_word_study`, or `open_factbook`.
+
+**Book content is encrypted in local resource files** - Use `capture_panel_screenshot` to let AI read what is visible in Logos, and use `get_clippings` for text you've explicitly clipped/highlighted.
 
 ## License
 

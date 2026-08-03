@@ -4,15 +4,16 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that c
 
 ## What This Does
 
-- **23 MCP tools** that let Claude read Bible text, search Scripture, navigate Logos, access your notes/highlights/favorites/clippings, check reading plans, explore word studies and factbook entries, search your library catalog, open commentaries and lexicons, run cross-resource searches, and capture Logos panels for vision reading
+- **24 MCP tools** that let Claude read Bible text, search Scripture, navigate Logos, access your notes/highlights/favorites/clippings, check reading plans, explore word studies and factbook entries, search your library catalog, open commentaries and lexicons, run cross-resource searches, capture Logos panels for vision reading, check what Logos is showing, and diagnose environment issues
 - **A Socratic Bible Study agent** that guides you through Scripture using questions (not lectures), welcoming any denominational background, with four questioning layers: Observation, Interpretation, Correlation, and Application
+- **A QA Tool Tester agent** that systematically exercises all tools and produces a pass/fail/skip report
 
 ## Prerequisites
 
 | Requirement | Details |
 |-------------|---------|
-| **macOS** | Required (uses macOS `open` command and AppleScript for Logos integration) |
-| **Logos Bible Software** | Installed at `/Applications/Logos.app` (tested with v48) |
+| **macOS or Windows** | macOS uses the `open` command and AppleScript; Windows uses the registered `logos4:` protocol handler and `tasklist` |
+| **Logos Bible Software** | macOS: `/Applications/Logos.app` (tested with v48); Windows: standard install under `%LOCALAPPDATA%\Logos` |
 | **Node.js** | v18+ (v23+ recommended for native `fetch` support) |
 | **Claude Code** | Anthropic's CLI tool ([install guide](https://docs.anthropic.com/en/docs/claude-code)) |
 | **Biblia API Key** | Free key from [bibliaapi.com](https://bibliaapi.com/) |
@@ -71,7 +72,7 @@ BIBLIA_API_KEY=your_api_key_here
 claude
 ```
 
-Once Claude Code starts, type `/mcp` to check that the "logos" server appears with 23 tools.
+Once Claude Code starts, type `/mcp` to check that the "logos" server appears with 24 tools.
 
 ## Using with Claude Desktop or Cowork
 
@@ -154,6 +155,13 @@ Tools for structured study paths
 |------|-------------|
 | `get_study_workflows` | Lists available study workflow templates and active instances |
 
+### System & Diagnostics
+Tools for troubleshooting and verifying your setup
+
+| Tool | What it does |
+|------|-------------|
+| `diagnose` | Checks Logos data paths, database availability, and API configuration |
+
 ## Using the Socratic Bible Study Agent
 
 Start Claude Code in the project directory, then:
@@ -182,14 +190,16 @@ The agent will ask what you want to study and guide you through Scripture using 
 LogosInteraction/
 ├── .claude/
 │   └── agents/
-│       └── socratic-bible-study.md    # Socratic agent definition
+│       ├── socratic-bible-study.md    # Socratic agent definition
+│       └── tool-tester.md            # QA agent for testing all 21 tools
 ├── .mcp.json                          # MCP server config (you create this)
 ├── .env                               # API key (you create this)
 ├── logos-mcp-server/
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── src/
-│   │   ├── index.ts                   # MCP server entry point (23 tools)
+│   │   ├── index.ts                   # MCP server entry point (24 tools)
+│   │   ├── cli.ts                     # Diagnose CLI entry point
 │   │   ├── config.ts                  # Paths, API config, constants
 │   │   ├── types.ts                   # Shared TypeScript types
 │   │   └── services/
@@ -206,15 +216,20 @@ LogosInteraction/
 The MCP server integrates with Logos through four channels:
 
 - **Biblia API** - Retrieves Bible text and search results via the free REST API from Faithlife (same company as Logos)
-- **macOS URL schemes** - Opens passages, word studies, and factbook entries directly in the Logos app using `logos4:///` URLs
+- **URL schemes** - Opens passages, word studies, and factbook entries directly in the Logos app using `logos4:///` URLs (via `open` on macOS, the registered protocol handler on Windows)
 - **SQLite databases** - Reads your personal data (notes, highlights, favorites, workflows, reading plans) and library catalog directly from the Logos local database files (read-only access, never modifies your data)
 - **Screen capture + vision** - Captures Logos windows so AI can read content displayed in the app UI when direct DB text access is unavailable
 
 ## Logos Data Path
 
-The server auto-detects your Logos data by scanning `~/Library/Application Support/Logos4/` for the per-install instance directory. Each Logos install uses a randomly named directory (e.g. `a3wo155q.w14`), so there is no fixed path to configure.
+The server auto-detects your Logos data by scanning for the per-install instance directory:
 
-If your Logos data lives at a non-standard path, the `LOGOS_DATA_DIR` and `LOGOS_CATALOG_DIR` environment variables remain available as manual overrides (set them in `.mcp.json`). The library catalog lives under `Data/` (not `Documents/`) — set `LOGOS_CATALOG_DIR` if your catalog path differs:
+```
+macOS:    ~/Library/Application Support/Logos4/Documents/<instance-id>/
+Windows:  %LOCALAPPDATA%\Logos\Documents\<instance-id>\
+```
+
+Each Logos install uses a randomly named instance directory (e.g. `a3wo155q.w14`); detection prefers the directory containing `LibraryCatalog/catalog.db`, so there is no fixed path to configure. If your Logos data lives at a non-standard path, the `LOGOS_DATA_DIR` and `LOGOS_CATALOG_DIR` environment variables remain available as manual overrides (set them in `.mcp.json`). The library catalog lives under `Data/` (not `Documents/`) — set `LOGOS_CATALOG_DIR` if your catalog path differs:
 
 ```json
 {
@@ -233,6 +248,8 @@ If your Logos data lives at a non-standard path, the `LOGOS_DATA_DIR` and `LOGOS
 ```
 
 ## Troubleshooting
+
+**Quick diagnostic check** - Run `cd logos-mcp-server && npm run diagnose` to verify all data paths, databases, and API configuration before launching Claude Code.
 
 **"BIBLIA_API_KEY is not set"** - Get a free key at [bibliaapi.com](https://bibliaapi.com/) and add it to the `env` block in `.mcp.json`. Bible-text tools need it, but Logos-local tools (notes, highlights, clippings, library catalog) work without it.
 

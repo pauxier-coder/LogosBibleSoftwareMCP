@@ -282,6 +282,14 @@ export async function captureLogosPanel(
     maxWidth?: number;
   } = {}
 ): Promise<ScreenshotResult> {
+  // Capture relies on clang/screencapture/sips — all macOS-only.
+  if (process.platform !== "darwin") {
+    return {
+      success: false,
+      error: "capture_panel_screenshot is currently macOS-only (it uses the macOS screencapture toolchain). Other Logos tools work on Windows.",
+    };
+  }
+
   // 1. Check Logos is running
   const running = await isLogosRunning();
   if (!running) {

@@ -31,6 +31,8 @@ export async function getBibleText(
   passage: string,
   bible: string = DEFAULT_BIBLE
 ): Promise<BibleTextResult> {
+  // Biblia version codes are uppercase; accept any case from callers.
+  bible = bible.toUpperCase();
   const text = await bibliaFetch(`/content/${bible}.txt`, { passage });
   return {
     passage,
@@ -52,7 +54,7 @@ export async function searchBible(
   query: string,
   options: { bible?: string; limit?: number; mode?: string } = {}
 ): Promise<BibleSearchResult> {
-  const bible = options.bible ?? DEFAULT_BIBLE;
+  const bible = (options.bible ?? DEFAULT_BIBLE).toUpperCase();
   const data = await bibliaFetch(`/search/${bible}`, {
     query,
     mode: options.mode ?? "verse",

@@ -22,8 +22,13 @@ async function openUrl(url: string): Promise<LogosCommandResult> {
 }
 
 export async function navigateToPassage(reference: string): Promise<LogosCommandResult> {
-  const logosRef = toLogosUrlRef(reference);
-  return openUrl(`logos4:///Bible/${logosRef}`);
+  try {
+    const logosRef = toLogosUrlRef(reference);
+    return openUrl(`logos4:///Bible/${logosRef}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, command: reference, error: msg };
+  }
 }
 
 export async function searchBibleInLogos(query: string): Promise<LogosCommandResult> {

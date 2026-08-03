@@ -2,6 +2,14 @@ import { homedir } from "os";
 import { join } from "path";
 import { existsSync, readdirSync, statSync } from "fs";
 
+// Load .env from the working directory (Node 20.12+). The README documents
+// .env for development; MCP clients normally pass env via their config.
+try {
+  process.loadEnvFile();
+} catch {
+  // No .env file, or Node predates loadEnvFile — env must come from the client.
+}
+
 // ─── Logos Data Paths ────────────────────────────────────────────────────────
 
 const IS_WINDOWS = process.platform === "win32";
@@ -128,7 +136,7 @@ export const LOGOS_URL_BASE = "logos4:";
 export const HELPER_CACHE_DIR = join(homedir(), "Library", "Caches", "logos-mcp");
 export const WINDOW_HELPER_BIN = join(HELPER_CACHE_DIR, "logos-window-helper");
 export const WINDOW_HELPER_SRC = join(HELPER_CACHE_DIR, "logos-window-helper.m");
-export const SCREENSHOT_TEMP_DIR = "/tmp";
+export const SCREENSHOT_TEMP_DIR = HELPER_CACHE_DIR;
 export const DEFAULT_CAPTURE_WAIT_MS = 4000;
 export const MAX_CAPTURE_WAIT_MS = 15000;
 

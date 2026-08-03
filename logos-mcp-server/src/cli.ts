@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync } from "fs";
+import Database from "better-sqlite3";
 import { LOGOS_DATA_DIR, LOGOS_CATALOG_DIR, DB_PATHS, BIBLIA_API_KEY } from "./config.js";
 
 let ok = true;
@@ -17,12 +18,32 @@ console.log("\nDatabases:");
 for (const [name, path] of Object.entries(DB_PATHS)) {
   const found = existsSync(path);
   if (!found) ok = false;
-  const icon = found ? "\u2713" : "\u2717";
+  const icon = found ? "✓" : "✗";
   console.log(`  ${icon} ${name.padEnd(14)} ${path}`);
 }
 
-console.log(`\nBIBLIA_API_KEY: ${BIBLIA_API_KEY ? "set" : "NOT SET"}`);
-if (!BIBLIA_API_KEY) ok = false;
+// existsSync alone can't catch an unloadable SQLite driver (e.g. a
+// better-sqlite3 ABI mismatch after a Node upgrade) — actually open one DB.
+console.log("\nSQLite engine:");
+const openable = Object.values(DB_PATHS).find((p) => existsSync(p));
+if (openable) {
+  try {
+    const db = new Database(openable, { readonly: true, fileMustExist: true });
+    db.prepare("SELECT 1").get();
+    db.close();
+    console.log("  ✓ opened a database successfully");
+  } catch (err) {
+    ok = false;
+    const msg = err instanceof Error ? err.message.split("\n")[0] : String(err);
+    console.log(`  ✗ cannot open databases: ${msg}`);
+    console.log("    (if this mentions ABI/NODE_MODULE_VERSION, run: npm rebuild better-sqlite3)");
+  }
+} else {
+  console.log("  - skipped (no database files found)");
+}
+
+// The key is optional: only the Biblia-backed Bible-text tools need it.
+console.log(`\nBIBLIA_API_KEY: ${BIBLIA_API_KEY ? "set" : "NOT SET (optional — Bible-text tools need it; Logos-local tools work without it)"}`);
 
 console.log(`\nStatus: ${ok ? "All checks passed" : "Some checks failed"}`);
 process.exit(ok ? 0 : 1);

@@ -11,6 +11,11 @@ function openDb(path: string): Database.Database {
   return new Database(path, { readonly: true, fileMustExist: true });
 }
 
+// Escape LIKE wildcards in user input so "%" and "_" match literally.
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, "\\$&");
+}
+
 // ─── Human-friendly type labels ─────────────────────────────────────────────
 
 const TYPE_LABELS: Record<string, string> = {
@@ -148,19 +153,19 @@ export function searchCatalog(options: {
 
     if (options.type) {
       const patterns = resolveTypeFilter(options.type);
-      sql += ` AND (${patterns.map(() => "Type LIKE ?").join(" OR ")})`;
+      sql += ` AND (${patterns.map(() => "Type LIKE ? ESCAPE '\\'").join(" OR ")})`;
       for (const p of patterns) {
-        params.push(`%${p}%`);
+        params.push(`%${escapeLike(p)}%`);
       }
     }
     if (options.query) {
-      sql += " AND (Title LIKE ? OR Description LIKE ? OR Subjects LIKE ?)";
-      const q = `%${options.query}%`;
+      sql += " AND (Title LIKE ? ESCAPE '\\' OR Description LIKE ? ESCAPE '\\' OR Subjects LIKE ? ESCAPE '\\')";
+      const q = `%${escapeLike(options.query)}%`;
       params.push(q, q, q);
     }
     if (options.author) {
-      sql += " AND Authors LIKE ?";
-      params.push(`%${options.author}%`);
+      sql += " AND Authors LIKE ? ESCAPE '\\'";
+      params.push(`%${escapeLike(options.author)}%`);
     }
 
     sql += " ORDER BY UseCount DESC";
@@ -238,18 +243,30 @@ export function getResourceTypeSummary(): ResourceTypeSummary[] {
 // Best-effort title lookup for a resourceId. Returns null when the catalog
 // DB is missing/unreadable or the id isn't found (callers should never throw).
 export function getResourceTitle(resourceId: string): string | null {
-  if (!resourceId) return null;
+  return getResourceTitles([resourceId]).get(resourceId) ?? null;
+}
+
+// Batched variant: one catalog open and one query for any number of ids.
+// Missing ids are simply absent from the map; failures yield an empty map.
+export function getResourceTitles(resourceIds: string[]): Map<string, string | null> {
+  const titles = new Map<string, string | null>();
+  const ids = resourceIds.filter(Boolean);
+  if (ids.length === 0) return titles;
   try {
     const db = openDb(DB_PATHS.catalog);
     try {
-      const row = db
-        .prepare("SELECT Title FROM Records WHERE ResourceId = ? LIMIT 1")
-        .get(resourceId) as { Title: string } | undefined;
-      return row?.Title ?? null;
+      const placeholders = ids.map(() => "?").join(", ");
+      const rows = db
+        .prepare(`SELECT ResourceId, Title FROM Records WHERE ResourceId IN (${placeholders})`)
+        .all(...ids) as Array<{ ResourceId: string; Title: string | null }>;
+      for (const r of rows) {
+        titles.set(r.ResourceId, r.Title ?? null);
+      }
     } finally {
       db.close();
     }
   } catch {
-    return null;
+    // catalog.db missing/unreadable — return what we have (empty map)
   }
+  return titles;
 }

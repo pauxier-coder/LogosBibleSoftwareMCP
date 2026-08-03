@@ -191,7 +191,7 @@ LogosInteraction/
 ├── .claude/
 │   └── agents/
 │       ├── socratic-bible-study.md    # Socratic agent definition
-│       └── tool-tester.md            # QA agent for testing all 21 tools
+│       └── tool-tester.md            # QA agent for testing all 24 tools
 ├── .mcp.json                          # MCP server config (you create this)
 ├── .env                               # API key (you create this)
 ├── logos-mcp-server/

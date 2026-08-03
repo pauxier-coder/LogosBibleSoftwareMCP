@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { existsSync } from "fs";
+import Database from "better-sqlite3";
 import { SERVER_NAME, SERVER_VERSION, LOGOS_DATA_DIR, LOGOS_CATALOG_DIR, DB_PATHS, BIBLIA_API_KEY } from "./config.js";
 
 // Service imports
@@ -88,8 +89,8 @@ async function main() {
     "Retrieve the text of a Bible passage. Defaults to the Lexham English Bible (LEB). Provide a reference like 'Genesis 1:1-5' or 'Romans 8:28-30'. Returns the passage text with its version. Useful for reading Scripture directly when the Logos app isn't running or when plain text is enough.",
     {
       passage: z.string().describe("Bible reference (e.g., 'Genesis 1:1-5', 'John 3:16')"),
-      bible: z.enum(["LEB", "KJV", "ASV", "DARBY", "YLT", "WEB"]).optional()
-        .describe("Bible version (default LEB). Served by the free Biblia web API (requires network + BIBLIA_API_KEY), NOT the user's Logos library. Call get_available_bibles for the full list."),
+      bible: z.string().optional()
+        .describe("Bible version code, case-insensitive (default LEB; also KJV, ASV, DARBY, YLT, WEB and more). Served by the free Biblia web API (requires network + BIBLIA_API_KEY), NOT the user's Logos library. Call get_available_bibles for the full list."),
     },
     async ({ passage, bible }) => {
       try {
@@ -100,7 +101,7 @@ async function main() {
         const note = msg.includes("BIBLIA_API_KEY")
           ? "\n\nNote: only the Biblia-backed Bible-text tools need this key — the Logos library, notes, highlights, navigation, and screenshot tools all still work."
           : "";
-        return text(`${msg}${note}`);
+        return err(`${msg}${note}`);
       }
     }
   );
@@ -112,8 +113,8 @@ async function main() {
     {
       passage: z.string().describe("Bible reference to center on"),
       context_verses: z.number().optional().describe("Verses before/after to include (default: 5)"),
-      bible: z.enum(["LEB", "KJV", "ASV", "DARBY", "YLT", "WEB"]).optional()
-        .describe("Bible version (default LEB). Served by the free Biblia web API (requires network + BIBLIA_API_KEY), NOT the user's Logos library. Call get_available_bibles for the full list."),
+      bible: z.string().optional()
+        .describe("Bible version code, case-insensitive (default LEB; also KJV, ASV, DARBY, YLT, WEB and more). Served by the free Biblia web API (requires network + BIBLIA_API_KEY), NOT the user's Logos library. Call get_available_bibles for the full list."),
     },
     async ({ passage, context_verses, bible }) => {
       try {
@@ -125,7 +126,7 @@ async function main() {
         const note = msg.includes("BIBLIA_API_KEY")
           ? "\n\nNote: only the Biblia-backed Bible-text tools need this key — the Logos library, notes, highlights, navigation, and screenshot tools all still work."
           : "";
-        return text(`${msg}${note}`);
+        return err(`${msg}${note}`);
       }
     }
   );
@@ -137,8 +138,8 @@ async function main() {
     {
       query: z.string().describe("Search terms (e.g., 'justification by faith')"),
       limit: z.number().optional().describe("Max results (default: 20)"),
-      bible: z.enum(["LEB", "KJV", "ASV", "DARBY", "YLT", "WEB"]).optional()
-        .describe("Bible version (default LEB). Served by the free Biblia web API (requires network + BIBLIA_API_KEY), NOT the user's Logos library. Call get_available_bibles for the full list."),
+      bible: z.string().optional()
+        .describe("Bible version code, case-insensitive (default LEB; also KJV, ASV, DARBY, YLT, WEB and more). Served by the free Biblia web API (requires network + BIBLIA_API_KEY), NOT the user's Logos library. Call get_available_bibles for the full list."),
     },
     async ({ query, limit, bible }) => {
       try {
@@ -151,7 +152,7 @@ async function main() {
         const note = msg.includes("BIBLIA_API_KEY")
           ? "\n\nNote: only the Biblia-backed Bible-text tools need this key — the Logos library, notes, highlights, navigation, and screenshot tools all still work."
           : "";
-        return text(`${msg}${note}`);
+        return err(`${msg}${note}`);
       }
     }
   );
@@ -192,9 +193,9 @@ async function main() {
         // abbreviations/formatting differences ("Ro 8:28" vs "Romans 8:28")
         // still match; fall back to the old string comparison when either
         // side fails to parse.
+        const canonicalPassage = canonicalReference(passage);
         const filtered = results.results.filter((r) => {
           const canonicalTitle = canonicalReference(r.title);
-          const canonicalPassage = canonicalReference(passage);
           if (canonicalTitle !== null && canonicalPassage !== null) {
             return canonicalTitle !== canonicalPassage;
           }
@@ -208,7 +209,7 @@ async function main() {
         const note = msg.includes("BIBLIA_API_KEY")
           ? "\n\nNote: only the Biblia-backed Bible-text tools need this key — the Logos library, notes, highlights, navigation, and screenshot tools all still work."
           : "";
-        return text(`${msg}${note}`);
+        return err(`${msg}${note}`);
       }
     }
   );
@@ -534,7 +535,7 @@ async function main() {
         const note = msg.includes("BIBLIA_API_KEY")
           ? "\n\nNote: only the Biblia-backed Bible-text tools need this key — the Logos library, notes, highlights, navigation, and screenshot tools all still work."
           : "";
-        return text(`${msg}${note}`);
+        return err(`${msg}${note}`);
       }
     }
   );
@@ -563,7 +564,7 @@ async function main() {
         const note = msg.includes("BIBLIA_API_KEY")
           ? "\n\nNote: only the Biblia-backed Bible-text tools need this key — the Logos library, notes, highlights, navigation, and screenshot tools all still work."
           : "";
-        return text(`${msg}${note}`);
+        return err(`${msg}${note}`);
       }
     }
   );
@@ -589,7 +590,7 @@ async function main() {
         const note = msg.includes("BIBLIA_API_KEY")
           ? "\n\nNote: only the Biblia-backed Bible-text tools need this key — the Logos library, notes, highlights, navigation, and screenshot tools all still work."
           : "";
-        return text(`${msg}${note}`);
+        return err(`${msg}${note}`);
       }
     }
   );
@@ -672,6 +673,26 @@ async function main() {
         const found = existsSync(path);
         const icon = found ? "OK" : "MISSING";
         lines.push(`- **${name}**: ${icon}  \`${path}\``);
+      }
+
+      // existsSync alone can't catch an unloadable SQLite driver (e.g. a
+      // better-sqlite3 ABI mismatch after a Node upgrade) — actually open one.
+      lines.push("");
+      lines.push("### SQLite engine\n");
+      const openable = Object.values(DB_PATHS).find((p) => existsSync(p));
+      if (openable) {
+        try {
+          const db = new Database(openable, { readonly: true, fileMustExist: true });
+          db.prepare("SELECT 1").get();
+          db.close();
+          lines.push("Opened a database successfully: OK");
+        } catch (e) {
+          const msg = e instanceof Error ? e.message.split("\n")[0] : String(e);
+          lines.push(`Cannot open databases: ${msg}`);
+          lines.push("(If this mentions ABI/NODE_MODULE_VERSION, run: npm rebuild better-sqlite3)");
+        }
+      } else {
+        lines.push("Skipped (no database files found).");
       }
 
       lines.push("");

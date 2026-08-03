@@ -22,8 +22,14 @@ describe("parseAnchorReference", () => {
 
   it("parses a cross-chapter range", () => {
     expect(
-      parseAnchorReference('[{"reference":{"raw":"bible.44.3.21-45.4.5"}}]')
+      parseAnchorReference('[{"reference":{"raw":"bible.44.3.21-44.4.5"}}]')
     ).toBe("Acts 3:21-4:5");
+  });
+
+  it("parses a cross-book range without dropping the end book", () => {
+    expect(
+      parseAnchorReference('[{"reference":{"raw":"bible.44.3.21-45.4.5"}}]')
+    ).toBe("Acts 3:21-Romans 4:5");
   });
 
   it("parses a chapter-only reference", () => {

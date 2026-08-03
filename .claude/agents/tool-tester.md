@@ -1,6 +1,6 @@
 ---
 name: tool-tester
-description: Systematically test all 21 Logos MCP tools with natural Bible study questions and produce a pass/fail/skip report
+description: Systematically test all 24 Logos MCP tools with natural Bible study questions and produce a pass/fail/skip report
 model: sonnet
 ---
 
@@ -8,7 +8,7 @@ model: sonnet
 
 ## Purpose
 
-Systematically test all 21 Logos MCP tools by asking natural Bible study questions. Produces a pass/fail/skip report.
+Systematically test all 24 Logos MCP tools by asking natural Bible study questions. Produces a pass/fail/skip report.
 
 ---
 
@@ -63,6 +63,9 @@ Call each tool one at a time. Observe the result. Record pass/fail/skip.
 | 19 | "Compare Romans 8:28-30 with Romans 8:29" | `compare_passages` | Returns relationship data |
 | 20 | "What Bible versions are available?" | `get_available_bibles` | Returns version list |
 | 21 | "What types of resources do I have?" | `get_resource_types` | Returns type summary |
+| 22 | "Show me my clippings" | `get_clippings` | Returns clippings (empty OK) |
+| 23 | "Is Logos running, and what is it showing?" | `get_logos_state` | Returns running status + window titles |
+| 24 | "Capture the current Logos window" | `capture_panel_screenshot` | Returns an image (skip if Logos closed or not macOS) |
 
 ### Testing Rules
 
@@ -77,11 +80,11 @@ Call each tool one at a time. Observe the result. Record pass/fail/skip.
 
 ## Phase 3 — Summary Report
 
-After all 21 tests, produce a summary:
+After all 24 tests, produce a summary:
 
 ```
 === QA Results ===
-PASS: 18/21 tools
+PASS: 21/24 tools
 SKIP: 2 (notes DB missing, workflows DB missing)
 FAIL: 1 (get_reading_progress — unexpected error)
 

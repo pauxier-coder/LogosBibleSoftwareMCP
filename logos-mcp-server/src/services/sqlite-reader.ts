@@ -3,7 +3,7 @@ import { existsSync } from "fs";
 import { DB_PATHS } from "../config.js";
 import { stripRichText } from "../utils/strip-markup.js";
 import { decodeClippingBlob, extractClippingText } from "../utils/clippings.js";
-import { getResourceTitle } from "./catalog-reader.js";
+import { getResourceTitles } from "./catalog-reader.js";
 import { parseReference, resolveBookName } from "./reference-parser.js";
 import type {
   ClippingResult,
@@ -21,6 +21,11 @@ function openDb(path: string): Database.Database {
     throw new Error(`Database not found: ${path}`);
   }
   return new Database(path, { readonly: true, fileMustExist: true });
+}
+
+// Escape LIKE wildcards in user input so "%" and "_" match literally.
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, "\\$&");
 }
 
 // ─── Highlights ──────────────────────────────────────────────────────────────
@@ -60,8 +65,9 @@ function queryVisualMarkupHighlights(options: {
       params.push(options.resourceId);
     }
     if (options.styleName) {
-      sql += " AND MarkupStyleName = ?";
-      params.push(options.styleName);
+      // LIKE to match the notestool fallback path's behavior for the same input.
+      sql += " AND MarkupStyleName LIKE ? ESCAPE '\\'";
+      params.push(`%${escapeLike(options.styleName)}%`);
     }
     sql += " ORDER BY SyncDate DESC";
     if (options.limit) {
@@ -109,8 +115,8 @@ function getHighlightsFromNotes(options: {
       params.push(options.resourceId);
     }
     if (options.styleName) {
-      sql += " AND s.Name LIKE ?";
-      params.push(`%${options.styleName}%`);
+      sql += " AND s.Name LIKE ? ESCAPE '\\'";
+      params.push(`%${escapeLike(options.styleName)}%`);
     }
     sql += " ORDER BY n.ModifiedDate DESC";
     if (options.limit) {
@@ -141,14 +147,12 @@ function getHighlightsFromNotes(options: {
 // resourceId (cached), null on any failure (catalog.db may be missing).
 function withResourceTitles(results: HighlightResult[]): HighlightResult[] {
   if (results.length === 0) return results;
-  const cache = new Map<string, string | null>();
-  return results.map((h) => {
-    if (!h.resourceId) return { ...h, resourceTitle: null };
-    if (!cache.has(h.resourceId)) {
-      cache.set(h.resourceId, getResourceTitle(h.resourceId));
-    }
-    return { ...h, resourceTitle: cache.get(h.resourceId) ?? null };
-  });
+  const ids = [...new Set(results.map((h) => h.resourceId).filter(Boolean))];
+  const titles = getResourceTitles(ids);
+  return results.map((h) => ({
+    ...h,
+    resourceTitle: h.resourceId ? titles.get(h.resourceId) ?? null : null,
+  }));
 }
 
 // ─── Favorites ───────────────────────────────────────────────────────────────
@@ -346,7 +350,7 @@ export function getClippings(options: {
              cd.Title as CollectionTitle
       FROM Clippings c
       LEFT JOIN ClippingsDocuments cd ON c.DocumentRowId = cd.RowId
-      WHERE cd.IsDeleted = 0 OR cd.IsDeleted IS NULL
+      WHERE (cd.IsDeleted = 0 OR cd.IsDeleted IS NULL)
     `;
     const params: unknown[] = [];
 
@@ -356,8 +360,8 @@ export function getClippings(options: {
     }
 
     if (options.tag) {
-      sql += " AND c.Tags LIKE ?";
-      params.push(`%${options.tag}%`);
+      sql += " AND c.Tags LIKE ? ESCAPE '\\'";
+      params.push(`%${escapeLike(options.tag)}%`);
     }
 
     sql += " ORDER BY c.CreatedDate DESC";
@@ -430,13 +434,13 @@ export function getUserNotes(options: {
     const params: unknown[] = [];
 
     if (options.notebookTitle) {
-      sql += " AND nb.Title LIKE ?";
-      params.push(`%${options.notebookTitle}%`);
+      sql += " AND nb.Title LIKE ? ESCAPE '\\'";
+      params.push(`%${escapeLike(options.notebookTitle)}%`);
     }
 
     if (options.query) {
-      sql += " AND n.ContentRichText LIKE ?";
-      params.push(`%${options.query}%`);
+      sql += " AND n.ContentRichText LIKE ? ESCAPE '\\'";
+      params.push(`%${escapeLike(options.query)}%`);
     }
 
     sql += " ORDER BY n.ModifiedDate DESC";
@@ -574,13 +578,18 @@ function bibleRawToHuman(raw: string): string | null {
 
   const chapter = parseInt(m[2], 10);
   const verse = m[3] ? parseInt(m[3], 10) : undefined;
+  const endBook = m[4] ? BOOKS_BY_NUMBER[parseInt(m[4], 10)] : undefined;
   const endChapter = m[5] ? parseInt(m[5], 10) : undefined;
   const endVerse = m[6] ? parseInt(m[6], 10) : undefined;
 
   let result = `${book} ${chapter}`;
   if (verse !== undefined) result += `:${verse}`;
   if (endChapter !== undefined) {
-    if (endVerse !== undefined) {
+    if (endBook !== undefined && endBook !== book) {
+      // Cross-book range, e.g. "bible.1.50.26-2.1.1" -> Genesis 50:26-Exodus 1:1
+      result += `-${endBook} ${endChapter}`;
+      if (endVerse !== undefined) result += `:${endVerse}`;
+    } else if (endVerse !== undefined) {
       result += endChapter === chapter ? `-${endVerse}` : `-${endChapter}:${endVerse}`;
     } else {
       result += `-${endChapter}`;

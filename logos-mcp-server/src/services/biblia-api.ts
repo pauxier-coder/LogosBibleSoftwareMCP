@@ -48,9 +48,14 @@ export async function searchBible(
     limit: String(options.limit ?? 20),
   }) as { resultCount: number; results: Array<{ title: string; preview: string }> };
 
+  const results = data.results ?? [];
   return {
     query,
-    resultCount: data.resultCount ?? 0,
+    // Biblia returns resultCount: -1 when the total is unknown
+    resultCount:
+      data.resultCount != null && data.resultCount >= 0
+        ? data.resultCount
+        : results.length,
     results: (data.results ?? []).map((r): BibleSearchHit => ({
       title: r.title ?? "",
       preview: r.preview ?? "",

@@ -52,11 +52,64 @@ export function getUserHighlights(options: {
       SyncDate: string | null;
     }>;
 
-    return rows.map((r) => ({
+    const results = rows.map((r) => ({
       resourceId: r.ResourceId,
       textRange: r.SavedTextRange,
       styleName: r.MarkupStyleName,
       syncDate: r.SyncDate,
+    }));
+    if (results.length > 0) return results;
+  } finally {
+    db.close();
+  }
+
+  // Modern Logos stores highlights as Kind=1 notes in notestool.db;
+  // visualmarkup.db is the legacy store and is empty on current installs.
+  return getHighlightsFromNotes(options);
+}
+
+function getHighlightsFromNotes(options: {
+  resourceId?: string;
+  styleName?: string;
+  limit?: number;
+}): HighlightResult[] {
+  const db = openDb(DB_PATHS.notes);
+  try {
+    let sql = `
+      SELECT r.ResourceId, n.AnchorsJson, s.Name AS StyleName, n.ModifiedDate
+      FROM Notes n
+      LEFT JOIN NoteStyles s ON n.NoteStyleId = s.NoteStyleId
+      LEFT JOIN ResourceIds r ON n.AnchorResourceIdId = r.ResourceIdId
+      WHERE n.Kind = 1 AND n.IsDeleted = 0 AND n.IsTrashed = 0
+    `;
+    const params: unknown[] = [];
+
+    if (options.resourceId) {
+      sql += " AND r.ResourceId = ?";
+      params.push(options.resourceId);
+    }
+    if (options.styleName) {
+      sql += " AND s.Name LIKE ?";
+      params.push(`%${options.styleName}%`);
+    }
+    sql += " ORDER BY n.ModifiedDate DESC";
+    if (options.limit) {
+      sql += " LIMIT ?";
+      params.push(options.limit);
+    }
+
+    const rows = db.prepare(sql).all(...params) as Array<{
+      ResourceId: string | null;
+      AnchorsJson: string | null;
+      StyleName: string | null;
+      ModifiedDate: string | null;
+    }>;
+
+    return rows.map((r) => ({
+      resourceId: r.ResourceId ?? "",
+      textRange: r.AnchorsJson ?? "",
+      styleName: r.StyleName ?? "",
+      syncDate: r.ModifiedDate,
     }));
   } finally {
     db.close();
@@ -257,6 +310,7 @@ export function getUserNotes(options: {
       FROM Notes n
       LEFT JOIN Notebooks nb ON n.NotebookExternalId = nb.ExternalId AND nb.IsDeleted = 0
       WHERE n.IsDeleted = 0 AND n.IsTrashed = 0
+        AND n.ContentRichText IS NOT NULL
     `;
     const params: unknown[] = [];
 

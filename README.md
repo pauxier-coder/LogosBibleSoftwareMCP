@@ -25,8 +25,8 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that c
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/robrawks/LogosInteraction.git
-cd LogosInteraction
+git clone https://github.com/robrawks/LogosBibleSoftwareMCP.git
+cd LogosBibleSoftwareMCP
 ```
 
 ### 2. Install dependencies and build
@@ -83,7 +83,7 @@ The same server can be used with Claude Desktop or other MCP clients. Edit `clau
   "mcpServers": {
     "logos": {
       "command": "node",
-      "args": ["/Users/you/LogosInteraction/logos-mcp-server/dist/index.js"],
+      "args": ["/Users/you/LogosBibleSoftwareMCP/logos-mcp-server/dist/index.js"],
       "env": {
         "BIBLIA_API_KEY": "your_api_key_here"
       }
@@ -187,7 +187,7 @@ The agent will ask what you want to study and guide you through Scripture using 
 ## Project Structure
 
 ```
-LogosInteraction/
+LogosBibleSoftwareMCP/
 ├── .claude/
 │   └── agents/
 │       ├── socratic-bible-study.md    # Socratic agent definition

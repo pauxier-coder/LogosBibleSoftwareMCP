@@ -17,6 +17,7 @@ import {
   getFavorites,
   getWorkflowTemplates,
   getWorkflowInstances,
+  bibleRawToHuman,
   getReadingProgress,
   getUserNotes,
 } from "./services/sqlite-reader.js";
@@ -426,9 +427,15 @@ async function main() {
       if (include_instances !== false) {
         const instances = getWorkflowInstances(instance_limit ?? 10);
         if (instances.length > 0) {
+          // The instance key is a raw Logos anchor ("bible.70.1.4-70.1.14").
+          // Decode it to a canonical reference. Titles usually carry the
+          // passage too, but they are free text and may not; the key always
+          // has it. Non-bible keys (topic studies, e.g. "bk.%goodnessOfGod")
+          // do not decode and stay raw.
           const iLines = instances.map((i) => {
             const status = i.completedDate ? "Completed" : `Step: ${i.currentStep ?? "unknown"}`;
-            return `- **${i.title}** (${i.key}) — ${status}, ${i.completedSteps.length} steps done`;
+            const subject = bibleRawToHuman(i.key) ?? i.key;
+            return `- **${i.title}** — ${subject} · ${status}, ${i.completedSteps.length} steps done`;
           });
           sections.push(`## Active Instances\n\n${iLines.join("\n")}`);
         }

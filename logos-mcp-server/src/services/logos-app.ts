@@ -1,6 +1,15 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { toLogosUrlRef } from "./reference-parser.js";
+import {
+  bibleUrl,
+  bibleSearchUrl,
+  wordStudyUrl,
+  factbookUrl,
+  resourceUrl,
+  guideUrl,
+  searchAllUrl,
+  GUIDE_REF_WARNING,
+} from "./logos-urls.js";
 import type { LogosCommandResult } from "../types.js";
 
 const execFileAsync = promisify(execFile);
@@ -23,8 +32,7 @@ async function openUrl(url: string): Promise<LogosCommandResult> {
 
 export async function navigateToPassage(reference: string): Promise<LogosCommandResult> {
   try {
-    const logosRef = toLogosUrlRef(reference);
-    return openUrl(`logos4:///Bible/${logosRef}`);
+    return openUrl(bibleUrl(reference));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, command: reference, error: msg };
@@ -32,18 +40,15 @@ export async function navigateToPassage(reference: string): Promise<LogosCommand
 }
 
 export async function searchBibleInLogos(query: string): Promise<LogosCommandResult> {
-  const encoded = encodeURIComponent(query);
-  return openUrl(`logos4:///Search?type=Bible&q=${encoded}`);
+  return openUrl(bibleSearchUrl(query));
 }
 
 export async function openWordStudy(word: string): Promise<LogosCommandResult> {
-  const encoded = encodeURIComponent(word);
-  return openUrl(`logos4:///WordStudy?word=${encoded}`);
+  return openUrl(wordStudyUrl(word));
 }
 
 export async function openFactbook(topic: string): Promise<LogosCommandResult> {
-  const encoded = encodeURIComponent(topic);
-  return openUrl(`logos4:///Factbook?ref=${encoded}`);
+  return openUrl(factbookUrl(topic));
 }
 
 export async function openResource(
@@ -51,13 +56,7 @@ export async function openResource(
   reference?: string
 ): Promise<LogosCommandResult> {
   try {
-    const encodedId = encodeURIComponent(resourceId);
-    let url = `logosres:${encodedId}`;
-    if (reference) {
-      const logosRef = toLogosUrlRef(reference);
-      url += `;ref=bible.${logosRef}`;
-    }
-    return openUrl(url);
+    return openUrl(resourceUrl(resourceId, reference));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { success: false, command: `logosres:${resourceId}`, error: msg };
@@ -69,9 +68,8 @@ export async function openGuide(
   reference: string
 ): Promise<LogosCommandResult> {
   try {
-    const logosRef = toLogosUrlRef(reference);
-    const template = encodeURIComponent(guideType);
-    return openUrl(`logos4:///Guide?t=${template}&ref=bible.${logosRef}`);
+    const result = await openUrl(guideUrl(guideType, reference));
+    return result.success ? { ...result, warning: GUIDE_REF_WARNING } : result;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { success: false, command: "", error: msg };
@@ -79,8 +77,7 @@ export async function openGuide(
 }
 
 export async function searchAll(query: string): Promise<LogosCommandResult> {
-  const encoded = encodeURIComponent(query);
-  return openUrl(`logos4:///Search?kind=AllSearch&syntax=v2&q=${encoded}`);
+  return openUrl(searchAllUrl(query));
 }
 
 export async function isLogosRunning(): Promise<boolean> {

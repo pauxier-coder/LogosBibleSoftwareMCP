@@ -10,28 +10,28 @@ describe("buildNavigationUrl", () => {
   describe("bible panel", () => {
     it("builds URL for a simple reference", () => {
       const result = buildNavigationUrl("bible", { reference: "Romans 12:1" });
-      expect(result.url).toBe("logos4:///Bible/Ro12.1");
+      expect(result.url).toBe("logosref:Bible.Ro12.1");
       expect(result.description).toBe("Bible: Romans 12:1");
     });
 
     it("builds URL for a verse range", () => {
       const result = buildNavigationUrl("bible", { reference: "Genesis 1:1-5" });
-      expect(result.url).toBe("logos4:///Bible/Ge1.1-1.5");
+      expect(result.url).toBe("logosref:Bible.Ge1.1-1.5");
     });
 
     it("builds URL for a cross-chapter range", () => {
       const result = buildNavigationUrl("bible", { reference: "Genesis 1:1-2:3" });
-      expect(result.url).toBe("logos4:///Bible/Ge1.1-2.3");
+      expect(result.url).toBe("logosref:Bible.Ge1.1-2.3");
     });
 
     it("builds URL for a chapter-only reference", () => {
       const result = buildNavigationUrl("bible", { reference: "Psalms 23" });
-      expect(result.url).toBe("logos4:///Bible/Ps23");
+      expect(result.url).toBe("logosref:Bible.Ps23");
     });
 
     it("builds URL for a numbered book", () => {
       const result = buildNavigationUrl("bible", { reference: "1 Corinthians 13:4" });
-      expect(result.url).toBe("logos4:///Bible/1Co13.4");
+      expect(result.url).toBe("logosref:Bible.1Co13.4");
     });
 
     it("throws when reference is missing", () => {
@@ -42,13 +42,13 @@ describe("buildNavigationUrl", () => {
   describe("factbook panel", () => {
     it("builds URL for a topic", () => {
       const result = buildNavigationUrl("factbook", { reference: "Moses" });
-      expect(result.url).toBe("logos4:///Factbook?ref=Moses");
+      expect(result.url).toBe("logos4:Factbook;ref=Moses");
       expect(result.description).toBe("Factbook: Moses");
     });
 
     it("encodes special characters", () => {
       const result = buildNavigationUrl("factbook", { reference: "Sea of Galilee" });
-      expect(result.url).toBe("logos4:///Factbook?ref=Sea%20of%20Galilee");
+      expect(result.url).toBe("logos4:Factbook;ref=Sea%20of%20Galilee");
     });
 
     it("throws when reference is missing", () => {
@@ -59,13 +59,13 @@ describe("buildNavigationUrl", () => {
   describe("wordstudy panel", () => {
     it("builds URL for a word", () => {
       const result = buildNavigationUrl("wordstudy", { reference: "agape" });
-      expect(result.url).toBe("logos4:///WordStudy?word=agape");
+      expect(result.url).toBe("logos4:Guide;t=BibleWordStudy;lemma=agape");
       expect(result.description).toBe("Word Study: agape");
     });
 
     it("encodes special characters", () => {
       const result = buildNavigationUrl("wordstudy", { reference: "hesed (lovingkindness)" });
-      expect(result.url).toBe("logos4:///WordStudy?word=hesed%20(lovingkindness)");
+      expect(result.url).toBe("logos4:Guide;t=BibleWordStudy;lemma=hesed%20(lovingkindness)");
     });
 
     it("throws when reference is missing", () => {
@@ -79,7 +79,7 @@ describe("buildNavigationUrl", () => {
         reference: "Romans 12:1",
         guideType: "Exegetical Guide",
       });
-      expect(result.url).toBe("logos4:///Guide?t=Exegetical%20Guide&ref=bible.Ro12.1");
+      expect(result.url).toBe("logos4:Guide;t=ExegeticalGuide;ref=Bible.Ro12.1");
       expect(result.description).toBe("Exegetical Guide: Romans 12:1");
     });
 
@@ -88,7 +88,7 @@ describe("buildNavigationUrl", () => {
         reference: "John 3:16",
         guideType: "Passage Guide",
       });
-      expect(result.url).toBe("logos4:///Guide?t=Passage%20Guide&ref=bible.Jn3.16");
+      expect(result.url).toBe("logos4:Guide;t=PassageGuide;ref=Bible.Jn3.16");
     });
 
     it("throws when reference is missing", () => {
@@ -105,7 +105,7 @@ describe("buildNavigationUrl", () => {
   describe("search panel", () => {
     it("builds URL for a search query", () => {
       const result = buildNavigationUrl("search", { reference: "justification by faith" });
-      expect(result.url).toBe("logos4:///Search?type=Bible&q=justification%20by%20faith");
+      expect(result.url).toBe("logos4:Search;kind=BibleSearch;syntax=v2;q=justification%20by%20faith");
       expect(result.description).toBe("Search: justification by faith");
     });
 
@@ -117,7 +117,7 @@ describe("buildNavigationUrl", () => {
   describe("searchall panel", () => {
     it("builds URL for a search all query", () => {
       const result = buildNavigationUrl("searchall", { reference: "baptism" });
-      expect(result.url).toBe("logos4:///Search?kind=AllSearch&syntax=v2&q=baptism");
+      expect(result.url).toBe("logos4:Search;kind=AllSearch;syntax=v2;q=baptism");
       expect(result.description).toBe("Search All: baptism");
     });
 
@@ -138,7 +138,7 @@ describe("buildNavigationUrl", () => {
         resourceId: "LLS:CLVNCOMM",
         reference: "Romans 12:1",
       });
-      expect(result.url).toBe("logosres:LLS%3ACLVNCOMM;ref=bible.Ro12.1");
+      expect(result.url).toBe("logosres:LLS%3ACLVNCOMM;ref=Bible.Ro12.1");
       expect(result.description).toBe("Resource: LLS:CLVNCOMM at Romans 12:1");
     });
 

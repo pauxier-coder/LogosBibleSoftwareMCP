@@ -12,7 +12,15 @@ import { promisify } from "util";
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { readFile, unlink } from "fs/promises";
 import { join } from "path";
-import { toLogosUrlRef } from "./reference-parser.js";
+import {
+  bibleUrl,
+  bibleSearchUrl,
+  wordStudyUrl,
+  factbookUrl,
+  resourceUrl,
+  guideUrl,
+  searchAllUrl,
+} from "./logos-urls.js";
 import { isLogosRunning } from "./logos-app.js";
 import {
   HELPER_CACHE_DIR,
@@ -141,9 +149,8 @@ export function buildNavigationUrl(
       if (!options.reference) {
         throw new Error("Bible panel requires a reference (e.g., 'Romans 12:1')");
       }
-      const logosRef = toLogosUrlRef(options.reference);
       return {
-        url: `logos4:///Bible/${logosRef}`,
+        url: bibleUrl(options.reference),
         description: `Bible: ${options.reference}`,
       };
     }
@@ -152,9 +159,8 @@ export function buildNavigationUrl(
       if (!options.reference) {
         throw new Error("Factbook panel requires a reference/topic (e.g., 'Moses')");
       }
-      const encoded = encodeURIComponent(options.reference);
       return {
-        url: `logos4:///Factbook?ref=${encoded}`,
+        url: factbookUrl(options.reference),
         description: `Factbook: ${options.reference}`,
       };
     }
@@ -163,9 +169,8 @@ export function buildNavigationUrl(
       if (!options.reference) {
         throw new Error("Word Study panel requires a word (e.g., 'agape')");
       }
-      const encoded = encodeURIComponent(options.reference);
       return {
-        url: `logos4:///WordStudy?word=${encoded}`,
+        url: wordStudyUrl(options.reference),
         description: `Word Study: ${options.reference}`,
       };
     }
@@ -177,10 +182,8 @@ export function buildNavigationUrl(
       if (!options.guideType) {
         throw new Error("Guide panel requires a guide_type (e.g., 'Exegetical Guide')");
       }
-      const logosRef = toLogosUrlRef(options.reference);
-      const template = encodeURIComponent(options.guideType);
       return {
-        url: `logos4:///Guide?t=${template}&ref=bible.${logosRef}`,
+        url: guideUrl(options.guideType, options.reference),
         description: `${options.guideType}: ${options.reference}`,
       };
     }
@@ -189,9 +192,8 @@ export function buildNavigationUrl(
       if (!options.reference) {
         throw new Error("Search panel requires a query");
       }
-      const encoded = encodeURIComponent(options.reference);
       return {
-        url: `logos4:///Search?type=Bible&q=${encoded}`,
+        url: bibleSearchUrl(options.reference),
         description: `Search: ${options.reference}`,
       };
     }
@@ -200,9 +202,8 @@ export function buildNavigationUrl(
       if (!options.reference) {
         throw new Error("Search All panel requires a query");
       }
-      const encoded = encodeURIComponent(options.reference);
       return {
-        url: `logos4:///Search?kind=AllSearch&syntax=v2&q=${encoded}`,
+        url: searchAllUrl(options.reference),
         description: `Search All: ${options.reference}`,
       };
     }
@@ -211,15 +212,9 @@ export function buildNavigationUrl(
       if (!options.resourceId) {
         throw new Error("Resource panel requires a resource_id");
       }
-      const encodedId = encodeURIComponent(options.resourceId);
-      let url = `logosres:${encodedId}`;
       let desc = `Resource: ${options.resourceId}`;
-      if (options.reference) {
-        const logosRef = toLogosUrlRef(options.reference);
-        url += `;ref=bible.${logosRef}`;
-        desc += ` at ${options.reference}`;
-      }
-      return { url, description: desc };
+      if (options.reference) desc += ` at ${options.reference}`;
+      return { url: resourceUrl(options.resourceId, options.reference), description: desc };
     }
 
     default:
@@ -263,6 +258,53 @@ async function maybeDownscale(tempPath: string, maxWidth: number): Promise<void>
   } catch {
     // sips unavailable or failed — proceed with the un-scaled image.
   }
+}
+
+// ─── Capture primitives ─────────────────────────────────────────────────────
+
+/**
+ * Brings Logos to the front. Region capture grabs whatever is physically on
+ * screen inside the rect, so an MCP client window sitting on top of Logos
+ * would otherwise end up in the image.
+ */
+/** Time for the window server to finish fronting Logos before we measure it. */
+const ACTIVATION_SETTLE_MS = 800;
+
+async function activateLogos(): Promise<void> {
+  try {
+    await execFileAsync("osascript", ["-e", 'tell application "Logos" to activate']);
+  } catch {
+    // Activation is best-effort; `open logos4://` has usually already fronted it.
+  }
+}
+
+/**
+ * Writes a PNG of `win` to `outPath`.
+ *
+ * Prefers `screencapture -l <windowID>`, which captures the window even when
+ * occluded. That path is backed by CGWindowListCreateImage, which Apple
+ * deprecated in macOS 14 and which no longer functions on macOS 26 — there it
+ * fails with "could not create image from window" regardless of Screen
+ * Recording permission. So we fall back to a bounds-based region capture,
+ * which still works. Region capture is second choice because it grabs whatever
+ * is on screen in that rect, occluding windows included.
+ */
+export async function captureWindowImage(
+  win: LogosWindow,
+  outPath: string
+): Promise<void> {
+  try {
+    await execFileAsync("screencapture", ["-x", "-l", String(win.windowID), outPath]);
+    if (existsSync(outPath)) return;
+  } catch {
+    // fall through to region capture
+  }
+
+  await execFileAsync("screencapture", [
+    "-x",
+    `-R${win.x},${win.y},${win.width},${win.height}`,
+    outPath,
+  ]);
 }
 
 // ─── Main capture function ──────────────────────────────────────────────────
@@ -316,9 +358,18 @@ export async function captureLogosPanel(
     return { success: false, error: `Failed to open URL: ${msg}` };
   }
 
+  // 3b. Front Logos so a region capture cannot pick up an overlapping window
+  await activateLogos();
+
   // 4. Wait for content to render
   const waitMs = Math.min(options.waitMs ?? DEFAULT_CAPTURE_WAIT_MS, MAX_CAPTURE_WAIT_MS);
   await new Promise((resolve) => setTimeout(resolve, waitMs));
+
+  // 4b. Re-front Logos immediately before measuring and capturing: another app
+  // may have taken focus during the render wait, and a region capture reads
+  // whatever is on screen, not the window itself.
+  await activateLogos();
+  await new Promise((resolve) => setTimeout(resolve, ACTIVATION_SETTLE_MS));
 
   // 5. Find the Logos window
   let mainWindow: LogosWindow | null;
@@ -344,11 +395,7 @@ export async function captureLogosPanel(
   const tempPath = join(SCREENSHOT_TEMP_DIR, `logos-mcp-capture-${timestamp}.png`);
 
   try {
-    await execFileAsync("screencapture", [
-      "-x",
-      "-l", String(mainWindow.windowID),
-      tempPath,
-    ]);
+    await captureWindowImage(mainWindow, tempPath);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { success: false, error: `Screenshot capture failed: ${msg}` };

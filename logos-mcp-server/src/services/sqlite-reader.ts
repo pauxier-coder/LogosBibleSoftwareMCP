@@ -647,7 +647,13 @@ export function parseAnchorReference(anchorsJson: string | null): string | null 
   return null;
 }
 
-function bibleRawToHuman(raw: string): string | null {
+/**
+ * Decode a raw Logos bible reference ("bible.70.1.4-70.1.14") to a human one
+ * ("Ephesians 1:4-14"). Returns null for anything that is not a bible
+ * reference — workflow keys, for instance, may be topic keys like
+ * "bk.%goodnessOfGod". Never throws.
+ */
+export function bibleRawToHuman(raw: string): string | null {
   const m = raw.match(BIBLE_RAW_RE);
   if (!m) return null;
   const book = BOOKS_BY_NUMBER[parseInt(m[1], 10)];

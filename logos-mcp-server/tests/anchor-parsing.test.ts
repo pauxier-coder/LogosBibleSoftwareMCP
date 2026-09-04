@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseAnchorReference,
   parseTagsJson,
+  bibleRawToHuman,
 } from "../src/services/sqlite-reader.js";
 
 // Fixtures are modeled on real AnchorsJson/TagsJson values observed in
@@ -165,5 +166,33 @@ describe("parseTagsJson", () => {
     expect(parseTagsJson("")).toEqual([]);
     expect(parseTagsJson("not json")).toEqual([]);
     expect(parseTagsJson('{"not":"an array"}')).toEqual([]);
+  });
+});
+
+// bibleRawToHuman is the same decoder parseAnchorReference uses, exported so
+// get_study_workflows can decode its instance keys. Fixtures below are real
+// Key values read out of Workflows.db.
+describe("bibleRawToHuman", () => {
+  it("decodes a verse range within one chapter", () => {
+    expect(bibleRawToHuman("bible.70.1.4-70.1.14")).toBe("Ephesians 1:4-14");
+  });
+
+  it("decodes a range in the Logos-numbered New Testament", () => {
+    expect(bibleRawToHuman("bible.68.5.11-68.5.21")).toBe(
+      "2 Corinthians 5:11-21"
+    );
+  });
+
+  it("decodes a chapter-only reference", () => {
+    expect(bibleRawToHuman("bible.19.98")).toBe("Psalms 98");
+  });
+
+  it("returns null for a non-bible workflow key", () => {
+    expect(bibleRawToHuman("bk.%goodnessOfGod")).toBeNull();
+  });
+
+  it("returns null rather than throwing on junk", () => {
+    expect(bibleRawToHuman("")).toBeNull();
+    expect(bibleRawToHuman("bible.")).toBeNull();
   });
 });

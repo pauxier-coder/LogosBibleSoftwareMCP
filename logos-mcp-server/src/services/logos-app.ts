@@ -8,7 +8,6 @@ import {
   resourceUrl,
   guideUrl,
   searchAllUrl,
-  GUIDE_REF_WARNING,
 } from "./logos-urls.js";
 import type { LogosCommandResult } from "../types.js";
 
@@ -69,7 +68,7 @@ export async function openGuide(
 ): Promise<LogosCommandResult> {
   try {
     const result = await openUrl(guideUrl(guideType, reference));
-    return result.success ? { ...result, warning: GUIDE_REF_WARNING } : result;
+    return result;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { success: false, command: "", error: msg };

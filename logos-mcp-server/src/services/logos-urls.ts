@@ -22,16 +22,17 @@ export function factbookUrl(topic: string): string {
 }
 
 /**
- * Bible Word Study. Greek/Hebrew input is qualified as a Logos lemma
- * (`lbs/el/ἀγάπη`); anything else is passed through, which Logos resolves as a
- * surface word.
+ * Bible Word Study. Every lemma must carry a language tag -- English included.
+ * A bare `lemma=love` is rejected and the panel opens blank; `lbs/en/love`
+ * works. Greek and Hebrew take `lbs/el/` and `lbs/he/`.
  */
 export function wordStudyUrl(word: string): string {
   const w = word.trim();
-  let lemma = w;
-  if (GREEK.test(w)) lemma = `lbs/el/${w}`;
-  else if (HEBREW.test(w)) lemma = `lbs/he/${w}`;
-  return `logos4:Guide;t=BibleWordStudy;lemma=${encodeURIComponent(lemma)}`;
+  let lang = "en";
+  if (GREEK.test(w)) lang = "el";
+  else if (HEBREW.test(w)) lang = "he";
+  const lemma = `lbs/${lang}/${w}`;
+  return `logos4:Guide;t=${encodeURIComponent("Bible Word Study")};lemma=${encodeURIComponent(lemma)}`;
 }
 
 export function bibleSearchUrl(query: string): string {
@@ -48,9 +49,14 @@ export function resourceUrl(resourceId: string, reference?: string): string {
   return url;
 }
 
-/** Logos guide templates are single tokens: "Passage Guide" -> "PassageGuide". */
+/**
+ * Logos wants the template name exactly as it appears in the app, spaces and
+ * all -- "Passage Guide", percent-encoded by the caller. Collapsing it to one
+ * token yields a template Logos does not recognise, and it opens an empty panel
+ * rather than reporting an error. Whitespace is normalised, not removed.
+ */
 export function guideTemplateToken(guideType: string): string {
-  return guideType.replace(/\s+/g, "");
+  return guideType.trim().replace(/\s+/g, " ");
 }
 
 export function guideUrl(guideType: string, reference: string): string {
@@ -58,11 +64,18 @@ export function guideUrl(guideType: string, reference: string): string {
   return `logos4:Guide;t=${t};ref=Bible.${toLogosUrlRef(reference)}`;
 }
 
-/**
- * Logos 53 opens the Guide panel for reference-keyed guides (Passage,
- * Exegetical) but leaves the reference box empty — no URL form found applies
- * it. Word-keyed guides (Bible Word Study) are unaffected.
+/*
+ * Verified 2026-09-04 on Logos 53.1.0.0002 (macOS) by dispatching each form and
+ * screenshotting the panel:
+ *
+ *   t=Passage%20Guide;ref=Bible.Jn6.35            -> populates
+ *   t=PassageGuide;ref=Bible.Eph1.4               -> blank
+ *   t=Bible%20Word%20Study;lemma=lbs%2Fen%2Flove  -> populates
+ *   t=BibleWordStudy;lemma=agape                  -> blank
+ *
+ * An earlier version of this file carried a GUIDE_REF_WARNING claiming Logos
+ * ignored the subject parameter and that no working form existed. That was an
+ * inference from our own malformed URLs, not a search of the URL space, and it
+ * was wrong. The two forms above are the fix; the warning is gone because there
+ * is nothing left to warn about.
  */
-export const GUIDE_REF_WARNING =
-  "Logos 53 opens the Guide panel but does not apply the reference from a URL; " +
-  "the passage must be typed into the guide's reference box.";

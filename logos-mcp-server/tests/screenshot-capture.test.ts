@@ -59,13 +59,15 @@ describe("buildNavigationUrl", () => {
   describe("wordstudy panel", () => {
     it("builds URL for a word", () => {
       const result = buildNavigationUrl("wordstudy", { reference: "agape" });
-      expect(result.url).toBe("logos4:Guide;t=BibleWordStudy;lemma=agape");
+      expect(result.url).toBe("logos4:Guide;t=Bible%20Word%20Study;lemma=lbs%2Fen%2Fagape");
       expect(result.description).toBe("Word Study: agape");
     });
 
     it("encodes special characters", () => {
       const result = buildNavigationUrl("wordstudy", { reference: "hesed (lovingkindness)" });
-      expect(result.url).toBe("logos4:Guide;t=BibleWordStudy;lemma=hesed%20(lovingkindness)");
+      expect(result.url).toBe(
+        "logos4:Guide;t=Bible%20Word%20Study;lemma=lbs%2Fen%2Fhesed%20(lovingkindness)"
+      );
     });
 
     it("throws when reference is missing", () => {
@@ -79,7 +81,7 @@ describe("buildNavigationUrl", () => {
         reference: "Romans 12:1",
         guideType: "Exegetical Guide",
       });
-      expect(result.url).toBe("logos4:Guide;t=ExegeticalGuide;ref=Bible.Ro12.1");
+      expect(result.url).toBe("logos4:Guide;t=Exegetical%20Guide;ref=Bible.Ro12.1");
       expect(result.description).toBe("Exegetical Guide: Romans 12:1");
     });
 
@@ -88,7 +90,7 @@ describe("buildNavigationUrl", () => {
         reference: "John 3:16",
         guideType: "Passage Guide",
       });
-      expect(result.url).toBe("logos4:Guide;t=PassageGuide;ref=Bible.Jn3.16");
+      expect(result.url).toBe("logos4:Guide;t=Passage%20Guide;ref=Bible.Jn3.16");
     });
 
     it("throws when reference is missing", () => {

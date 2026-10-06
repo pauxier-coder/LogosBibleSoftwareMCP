@@ -22,7 +22,7 @@ import {
   getUserNotes,
 } from "./services/sqlite-reader.js";
 import { searchCatalog, getResourceTypeSummary, typeLabel } from "./services/catalog-reader.js";
-import { captureLogosPanel, getLogosWindowTitles } from "./services/screenshot-capture.js";
+import { captureLogosPanel, getLogosWindowTitles, scrollLogosPanel } from "./services/screenshot-capture.js";
 import type { CaptureToolType } from "./types.js";
 
 function text(s: string) {
@@ -479,17 +479,18 @@ async function main() {
   // ── 15. open_resource ─────────────────────────────────────────────────────
   server.tool(
     "open_resource",
-    "SIDE EFFECT ONLY — opens the Logos UI on screen; returns no data. Open a specific resource (commentary, lexicon, etc.) in Logos, optionally at a Bible passage. Use to show the user a resource, or to position Logos before capture_panel_screenshot.",
+    "SIDE EFFECT ONLY — opens the Logos UI on screen; returns no data. Open a specific resource (commentary, lexicon, etc.) in Logos, optionally at a Bible passage, a Louw-Nida entry number, or a lexicon headword. Use to show the user a resource, or to position Logos before capture_panel_screenshot.",
     {
-      resource_id: z.string().describe("Resource ID from the library catalog (e.g., 'LLS:CLVNCOMM')"),
-      reference: z.string().optional().describe("Bible reference to navigate to within the resource (e.g., 'Romans 12:1')"),
+      resource_id: z.string().describe("Resource ID from the library catalog (e.g., 'LLS:CLVNCOMM'; BDAG 'LLS:46.30.18', Louw-Nida 'LLS:46.30.4', LSJ 'LLS:46.30.25')"),
+      reference: z.string().optional().describe("Bible reference (e.g., 'Romans 12:1'), or for Louw-Nida an entry number like '33.117' / 'LN 33.117'"),
+      headword: z.string().optional().describe("Dictionary/lexicon headword to jump to, in lexical form (e.g., 'ἡσυχάζω'). Takes precedence over reference."),
     },
-    async ({ resource_id, reference }) => {
+    async ({ resource_id, reference, headword }) => {
       if (!(await isLogosRunning())) {
         return text("Logos is not running. Ask the user to launch Logos first, or use get_bible_text / search_bible, which work without the app.");
       }
-      const result = await openResource(resource_id, reference);
-      const refStr = reference ? ` at ${reference}` : "";
+      const result = await openResource(resource_id, reference, headword);
+      const refStr = headword ? ` headword ${headword}` : reference ? ` at ${reference}` : "";
       return result.success
         ? text(`Dispatched to Logos: resource \`${resource_id}\`${refStr}. This only opens the Logos UI on the user's screen — no data is returned to you. Call get_logos_state to confirm what Logos is showing, or capture_panel_screenshot (panel_type: 'resource') to see the results.`)
         : err(`Failed to open resource: ${result.error}`);
@@ -657,17 +658,23 @@ async function main() {
       guide_type: z.string().optional()
         .describe("Guide template name (required when panel_type is 'guide', e.g., 'Exegetical Guide')"),
       resource_id: z.string().optional()
-        .describe("Resource ID from the library catalog (required when panel_type is 'resource')"),
+        .describe("Resource ID from the library catalog (required when panel_type is 'resource'). BDAG 'LLS:46.30.18', Louw-Nida 'LLS:46.30.4', LSJ 'LLS:46.30.25'. With panel_type 'resource', reference may be a Bible reference or a Louw-Nida entry number ('33.117')."),
+      headword: z.string().optional()
+        .describe("panel_type 'resource' only: lexicon headword to open at, in lexical form (e.g., 'ἡσυχάζω'). In Louw-Nida the breadcrumb then shows the domain and subdomain range."),
+      factbook_pick: z.number().int().min(1).max(10).optional()
+        .describe("panel_type 'factbook' only: which row of the Factbook search dropdown to open (default 1). Greek/Hebrew lemmas are typed into the search box automatically. If the result is a proper noun (capitalized header, a place or person, no Biblical Senses), retry with 2."),
       wait_ms: z.number().optional()
         .describe("Milliseconds to wait for content to render (default: 4000, max: 15000)"),
       max_width: z.number().int().optional()
         .describe("Max image width in px before base64 encoding (default 1400). Lower = fewer tokens."),
     },
-    async ({ panel_type, reference, guide_type, resource_id, wait_ms, max_width }) => {
+    async ({ panel_type, reference, guide_type, resource_id, headword, factbook_pick, wait_ms, max_width }) => {
       const result = await captureLogosPanel(panel_type as CaptureToolType, {
         reference,
         guideType: guide_type,
         resourceId: resource_id,
+        headword,
+        factbookPick: factbook_pick,
         waitMs: wait_ms,
         maxWidth: max_width,
       });
@@ -681,6 +688,36 @@ async function main() {
         ? ` (${result.bounds.width}x${result.bounds.height})`
         : "";
       return image(result.imageBase64, `${desc}${boundsInfo}`);
+    }
+  );
+
+  // ── 23b. scroll_panel ─────────────────────────────────────────────────────
+  server.tool(
+    "scroll_panel",
+    "Scroll one panel of the Logos window and return a screenshot of the result. Use after capture_panel_screenshot when the content you need (rest of a lexicon entry, remaining entries of a Louw-Nida subdomain, lower sections of a Factbook article) is below the fold. Does not navigate; scrolls whichever panel sits at the chosen position.",
+    {
+      position: z.enum(["left", "center", "right"]).optional()
+        .describe("Which panel to scroll, by horizontal position in the window (default 'right'). Look at the last screenshot to choose."),
+      pages: z.number().min(-10).max(10).optional()
+        .describe("Screens to scroll; negative scrolls up (default 1). One page is ~70% of the window height, so consecutive shots overlap."),
+      x_fraction: z.number().min(0).max(1).optional()
+        .describe("Override: horizontal point to scroll at, as a fraction of window width (0 = left edge). Use when panels are laid out unusually."),
+      capture: z.boolean().optional()
+        .describe("Return a screenshot after scrolling (default true)."),
+      max_width: z.number().int().optional()
+        .describe("Max image width in px (default 1400)."),
+    },
+    async ({ position, pages, x_fraction, capture, max_width }) => {
+      const result = await scrollLogosPanel({
+        position,
+        pages,
+        xFraction: x_fraction,
+        capture,
+        maxWidth: max_width,
+      });
+      if (!result.success) return err(result.error ?? "Scroll failed");
+      if (!result.imageBase64) return text(result.description ?? "Scrolled.");
+      return image(result.imageBase64, result.description ?? "Logos after scroll");
     }
   );
 

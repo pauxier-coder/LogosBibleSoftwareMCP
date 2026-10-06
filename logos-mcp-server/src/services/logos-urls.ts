@@ -43,10 +43,40 @@ export function searchAllUrl(query: string): string {
   return `logos4:Search;kind=AllSearch;syntax=v2;q=${encodeURIComponent(query)}`;
 }
 
-export function resourceUrl(resourceId: string, reference?: string): string {
+/** A Louw-Nida entry number, bare or prefixed: "33.117", "LN 33.117", "LouwNida.33.117". */
+const LN_REF = /^(?:LN\s*|LouwNida\.)?(\d{1,2}\.\d{1,3}[a-z]?)$/i;
+
+/** Returns the `LouwNida.X.Y` datatype ref for an LN entry number, or null. */
+export function louwNidaRef(reference: string): string | null {
+  const m = reference.trim().match(LN_REF);
+  return m ? `LouwNida.${m[1]}` : null;
+}
+
+/**
+ * Opens a resource, optionally at a Bible reference, a Louw-Nida entry number,
+ * or a dictionary headword. Verified on Logos 53 (2026-10-06):
+ *
+ *   logosres:LLS%3A46.30.18;hw=ἀτάκτως          -> BDAG article for ἀτάκτως
+ *   logosres:LLS%3A46.30.4;hw=ἀτάκτως           -> LN 88.247 (breadcrumb shows the subdomain)
+ *   logosres:LLS%3A46.30.4;ref=LouwNida.33.117  -> LN 33.117 at the top of the panel
+ *
+ * `headword` wins over `reference` when both are given. The headword must be
+ * the lexical form (lemma), accented as the lexicon prints it.
+ */
+export function resourceUrl(resourceId: string, reference?: string, headword?: string): string {
   let url = `logosres:${encodeURIComponent(resourceId)}`;
-  if (reference) url += `;ref=Bible.${toLogosUrlRef(reference)}`;
+  if (headword && headword.trim()) {
+    url += `;hw=${encodeURIComponent(headword.trim().normalize("NFC"))}`;
+  } else if (reference) {
+    const ln = louwNidaRef(reference);
+    url += ln ? `;ref=${ln}` : `;ref=Bible.${toLogosUrlRef(reference)}`;
+  }
   return url;
+}
+
+/** Whether a term contains Greek or Hebrew script (needs Factbook type-ahead). */
+export function isBiblicalScript(term: string): boolean {
+  return GREEK.test(term) || HEBREW.test(term);
 }
 
 /**

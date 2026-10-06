@@ -52,10 +52,11 @@ export async function openFactbook(topic: string): Promise<LogosCommandResult> {
 
 export async function openResource(
   resourceId: string,
-  reference?: string
+  reference?: string,
+  headword?: string
 ): Promise<LogosCommandResult> {
   try {
-    return openUrl(resourceUrl(resourceId, reference));
+    return openUrl(resourceUrl(resourceId, reference, headword));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { success: false, command: `logosres:${resourceId}`, error: msg };
